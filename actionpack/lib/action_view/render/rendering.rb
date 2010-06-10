@@ -21,9 +21,7 @@ module ActionView
         elsif options.key?(:partial)
           _render_partial(options)
         else
-          template = _determine_template(options)
-          lookup_context.freeze_formats(template.formats, true)
-          _render_template(template, options[:layout], options)
+          TemplateRenderer.new(self, options).render
         end
       when :update
         update_page(&block)
@@ -32,35 +30,64 @@ module ActionView
       end
     end
 
-    # Determine the template to be rendered using the given options.
-    def _determine_template(options) #:nodoc:
-      if options.key?(:inline)
-        handler = Template.handler_class_for_extension(options[:type] || "erb")
-        Template.new(options[:inline], "inline template", handler, {})
-      elsif options.key?(:text)
-        Template::Text.new(options[:text], formats.try(:first))
-      elsif options.key?(:file)
-        with_fallbacks { find_template(options[:file], options[:prefix]) }
-      elsif options.key?(:template)
-        options[:template].respond_to?(:render) ?
-          options[:template] : find_template(options[:template], options[:prefix])
+    class TemplateRenderer #:nodoc:
+      def initialize(view_context, options)
+        @view = view_context
+        @options = options
       end
-    end
 
-    # Renders the given template. An string representing the layout can be
-    # supplied as well.
-    def _render_template(template, layout = nil, options = {}) #:nodoc:
-      locals = options[:locals] || {}
-      layout = find_layout(layout) if layout
+      def render
+        setup
+        instrument do
+          render_layout(render_template)
+        end
+      end
 
-      ActiveSupport::Notifications.instrument("render_template.action_view",
-        :identifier => template.identifier, :layout => layout.try(:virtual_path)) do
+    private
 
-        content = template.render(self, locals) { |*name| _layout_for(*name) }
-        @_content_for[:layout] = content if layout
+      def setup
+        @template = find_template
+        @view.lookup_context.freeze_formats(@template.formats, true)
 
-        content = _render_layout(layout, locals) if layout
-        content
+        @layout = nil
+        @payload = { :identifier => @template.identifier }
+        if @options.key?(:layout)
+          @layout = @view.find_layout(@options[:layout])
+          @payload[:layout] = @layout.try(:virtual_path)
+        end
+
+        @locals = @options[:locals] || {}
+      end
+
+      def render_template
+        @template.render(@view, @locals) { |*name| @view._layout_for(*name) }
+      end
+
+      def render_layout(content)
+        if @layout
+          @view.instance_variable_get('@_content_for')[:layout] = content
+          @view._render_layout(@layout, @locals)
+        else
+          content
+        end
+      end
+
+      def instrument(&block)
+        ActiveSupport::Notifications.instrument(:'render_template.action_view', @payload, &block)
+      end
+
+      def find_template
+        if @options.key?(:inline)
+          handler = Template.handler_class_for_extension(@options[:type] || "erb")
+          Template.new(@options[:inline], "inline template", handler, {})
+        elsif @options.key?(:text)
+          Template::Text.new(@options[:text], @view.formats.try(:first))
+        elsif @options.key?(:file)
+          @view.with_fallbacks { @view.find_template(@options[:file], @options[:prefix]) }
+        elsif @options.key?(:template)
+          @options[:template].respond_to?(:render) ?
+            @options[:template] : @view.find_template(@options[:template], @options[:prefix])
+        end
       end
     end
   end
