@@ -6,7 +6,7 @@ module ActionView
       self.default_format = Mime::JS
 
       def compile(template)
-        "update_page do |page|;#{template.source}\nend"
+        "update_page { |page| #{template.source}\n}"
       end
 
       def default_format

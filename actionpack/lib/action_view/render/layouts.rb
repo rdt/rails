@@ -72,8 +72,8 @@ module ActionView
     end
 
     # Contains the logic that actually renders the layout.
-    def _render_layout(layout, locals, &block) #:nodoc:
-      layout.render(self, locals){ |*name| _layout_for(*name, &block) }
+    def _render_layout(body, layout, locals, &block) #:nodoc:
+      layout.render_to_body(body, self, locals){ |*name| _layout_for(*name, &block) }
     end
   end
 end

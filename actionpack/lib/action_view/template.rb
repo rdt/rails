@@ -121,7 +121,13 @@ module ActionView
       @formats = Array.wrap(format).map(&:to_sym)
     end
 
-    def render(view, locals, &block)
+    def render(view, locals, &layout_block)
+      body = []
+      render_to_body(body, view, locals, &layout_block)
+      view._body_to_string(body)
+    end
+
+    def render_to_body(body, view, locals, &layout_block)
       # Notice that we use a bang in this instrumentation because you don't want to
       # consume this in production. This is only slow if it's being listened to.
       ActiveSupport::Notifications.instrument("!render_template.action_view", :virtual_path => @virtual_path) do
@@ -132,7 +138,8 @@ module ActionView
         end
 
         method_name = compile(locals, view, mod)
-        view.send(method_name, locals, &block)
+        body << view.send(method_name, locals, &layout_block)
+        body
       end
     rescue Exception => e
       if e.is_a?(Template::Error)

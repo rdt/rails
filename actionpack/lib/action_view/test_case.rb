@@ -100,7 +100,7 @@ module ActionView
 
       def render(options = {}, local_assigns = {}, &block)
         view.assign(_assigns)
-        @rendered << output = view.render(options, local_assigns, &block)
+        @rendered << output = view.render(options, local_assigns, &block).to_s
         output
       end
 
@@ -140,9 +140,9 @@ module ActionView
       module Locals
         attr_accessor :locals
 
-        def _render_partial(options)
+        def _render_partial(body, options)
           locals[options[:partial]] = options[:locals]
-          super(options)
+          super
         end
       end
 

@@ -47,12 +47,16 @@ module ActionController
 
       options[:text] = nil if options.delete(:nothing) == true
       options[:text] = " " if options.key?(:text) && options[:text].nil?
+
+      options[:template].sub!(/^\//, '') if options.key?(:template)
+
       super
     end
 
-    def render_to_body(options)
-      options[:template].sub!(/^\//, '') if options.key?(:template)
-      super || " "
+    def render_to_body(body, *args)
+      super
+      body << ' ' if body.blank?
+      body
     end
 
     def _handle_method_missing

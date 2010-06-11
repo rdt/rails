@@ -13,33 +13,54 @@ module ActionView
     #
     # If no options hash is passed or :update specified, the default is to render a partial and use the second parameter
     # as the locals hash.
-    def render(options = {}, locals = {}, &block)
+    def render(options = {}, locals = {}, &layout_block)
+      _body_to_string(render_to_body([], options, locals, &layout_block))
+    end
+
+    def render_to_body(body, options = {}, locals = {}, &layout_block)
       case options
       when Hash
         if block_given?
-          _render_partial(options.merge(:partial => options[:layout]), &block)
+          _render_partial(body, options.merge(:partial => options[:layout]), &layout_block)
         elsif options.key?(:partial)
-          _render_partial(options)
+          _render_partial(body, options)
         else
-          TemplateRenderer.new(self, options).render
+          _render_template(body, options)
         end
       when :update
-        update_page(&block)
+        body << update_page(&layout_block)
       else
-        _render_partial(:partial => options, :locals => locals)
+        _render_partial(body, :partial => options, :locals => locals)
       end
+
+      body
+    end
+
+    def _body_to_string(body)
+      str = nil
+      body.each { |part| str ? str << part.to_s : str = part.to_s } if body
+      str
+    end
+
+  private
+
+    def _render_template(body, options) #:nodoc:
+      TemplateRenderer.new(self, options).render(body)
     end
 
     class TemplateRenderer #:nodoc:
       def initialize(view_context, options)
-        @view = view_context
-        @options = options
+        @view, @options = view_context, options
       end
 
-      def render
+      def render(body)
         setup
         instrument do
-          render_layout(render_template)
+          if @layout
+            render_layout(body)
+          else
+            render_template_to_body(body)
+          end
         end
       end
 
@@ -59,17 +80,20 @@ module ActionView
         @locals = @options[:locals] || {}
       end
 
-      def render_template
-        @template.render(@view, @locals) { |*name| @view._layout_for(*name) }
+      def render_layout(body)
+        content_for = @view.instance_variable_get('@_content_for')
+        content_for[:layout] = render_template_to_string
+        @view._render_layout(body, @layout, @locals)
+        content_for.delete(:layout)
+        body
       end
 
-      def render_layout(content)
-        if @layout
-          @view.instance_variable_get('@_content_for')[:layout] = content
-          @view._render_layout(@layout, @locals)
-        else
-          content
-        end
+      def render_template_to_body(body)
+        @template.render_to_body(body, @view, @locals) { |*name| @view._layout_for(*name) }
+      end
+
+      def render_template_to_string
+        @template.render(@view, @locals) { |*name| @view._layout_for(*name) }
       end
 
       def instrument(&block)

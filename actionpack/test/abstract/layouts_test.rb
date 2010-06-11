@@ -157,37 +157,37 @@ module AbstractControllerTests
       test "when no layout is specified, and no default is available, render without a layout" do
         controller = Blank.new
         controller.process(:index)
-        assert_equal "Hello blank!", controller.response_body
+        assert_equal ["Hello blank!"], controller.response_body
       end
 
       test "when layout is specified as a string, render with that layout" do
         controller = WithString.new
         controller.process(:index)
-        assert_equal "With String Hello string!", controller.response_body
+        assert_equal ["With String Hello string!"], controller.response_body
       end
 
       test "when layout is overwriten by :default in render, render default layout" do
         controller = WithString.new
         controller.process(:overwrite_default)
-        assert_equal "With String Hello string!", controller.response_body
+        assert_equal ["With String Hello string!"], controller.response_body
       end
 
       test "when layout is overwriten by string in render, render new layout" do
         controller = WithString.new
         controller.process(:overwrite_string)
-        assert_equal "Overwrite Hello string!", controller.response_body
+        assert_equal ["Overwrite Hello string!"], controller.response_body
       end
 
       test "when layout is overwriten by false in render, render no layout" do
         controller = WithString.new
         controller.process(:overwrite_false)
-        assert_equal "Hello string!", controller.response_body
+        assert_equal ["Hello string!"], controller.response_body
       end
 
       test "when text is rendered, render no layout" do
         controller = WithString.new
         controller.process(:overwrite_skip)
-        assert_equal "Hello text!", controller.response_body
+        assert_equal ["Hello text!"], controller.response_body
       end
 
       test "when layout is specified as a string, but the layout is missing, raise an exception" do
@@ -197,31 +197,31 @@ module AbstractControllerTests
       test "when layout is specified as false, do not use a layout" do
         controller = WithFalseLayout.new
         controller.process(:index)
-        assert_equal "Hello false!", controller.response_body
+        assert_equal ["Hello false!"], controller.response_body
       end
 
       test "when layout is specified as nil, do not use a layout" do
         controller = WithNilLayout.new
         controller.process(:index)
-        assert_equal "Hello nil!", controller.response_body
+        assert_equal ["Hello nil!"], controller.response_body
       end
 
       test "when layout is specified as a proc, call it and use the layout returned" do
         controller = WithProc.new
         controller.process(:index)
-        assert_equal "Overwrite Hello proc!", controller.response_body
+        assert_equal ["Overwrite Hello proc!"], controller.response_body
       end
 
       test "when layout is specified as a symbol, call the requested method and use the layout returned" do
         controller = WithSymbol.new
         controller.process(:index)
-        assert_equal "Overwrite Hello symbol!", controller.response_body
+        assert_equal ["Overwrite Hello symbol!"], controller.response_body
       end
 
       test "when layout is specified as a symbol and the method returns nil, don't use a layout" do
         controller = WithSymbolReturningNil.new
         controller.process(:index)
-        assert_equal "Hello nilz!", controller.response_body
+        assert_equal ["Hello nilz!"], controller.response_body
       end
 
       test "when the layout is specified as a symbol and the method doesn't exist, raise an exception" do
@@ -235,32 +235,32 @@ module AbstractControllerTests
       test "when a child controller does not have a layout, use the parent controller layout" do
         controller = WithStringChild.new
         controller.process(:index)
-        assert_equal "With String Hello string!", controller.response_body
+        assert_equal ["With String Hello string!"], controller.response_body
       end
 
       test "when a child controller has specified a layout, use that layout and not the parent controller layout" do
         controller = WithStringOverriddenChild.new
         controller.process(:index)
-        assert_equal "With Override Hello string!", controller.response_body
+        assert_equal ["With Override Hello string!"], controller.response_body
       end
 
       test "when a child controller has an implied layout, use that layout and not the parent controller layout" do
         controller = WithStringImpliedChild.new
         controller.process(:index)
-        assert_equal "With Implied Hello string!", controller.response_body
+        assert_equal ["With Implied Hello string!"], controller.response_body
       end
 
       test "when a child controller specifies layout nil, do not use the parent layout" do
         controller = WithNilChild.new
         controller.process(:index)
-        assert_equal "Hello string!", controller.response_body
+        assert_equal ["Hello string!"], controller.response_body
       end
 
       test "when a grandchild has no layout specified, the child has an implied layout, and the " \
         "parent has specified a layout, use the child controller layout" do
           controller = WithChildOfImplied.new
           controller.process(:index)
-          assert_equal "With Implied Hello string!", controller.response_body
+          assert_equal ["With Implied Hello string!"], controller.response_body
       end
 
       test "raises an exception when specifying layout true" do

@@ -31,6 +31,10 @@ class UrlHelperTest < ActiveSupport::TestCase
     {}
   end
 
+  def _body_to_string(body)
+    body.join('')
+  end
+
   def abcd(hash = {})
     hash_for(:a => :b, :c => :d).merge(hash)
   end

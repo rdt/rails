@@ -22,6 +22,10 @@ module ActionView #:nodoc:
         to_s
       end
 
+      def render_to_body(body, *args)
+        body << to_s
+      end
+
       def formats
         [@mime_type.to_sym]
       end

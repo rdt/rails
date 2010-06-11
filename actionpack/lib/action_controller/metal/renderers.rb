@@ -18,16 +18,18 @@ module ActionController
       def _write_render_options
         renderers = _renderers.map do |name, value|
           <<-RUBY_EVAL
-            if options.key?(:#{name})
-              _process_options(options)
-              return _render_option_#{name}(options.delete(:#{name}), options)
-            end
+            when options.key?(:#{name})
+              _render_option_#{name}(body, options.delete(:#{name}), options)
           RUBY_EVAL
         end
 
         class_eval <<-RUBY_EVAL, __FILE__, __LINE__ + 1
-          def _handle_render_options(options)
+          def _render_template(body, options)
+            case
             #{renderers.join}
+            else
+              super
+            end
           end
         RUBY_EVAL
       end
@@ -41,10 +43,6 @@ module ActionController
         _write_render_options
       end
       alias use_renderer use_renderers
-    end
-
-    def render_to_body(options)
-      _handle_render_options(options) || super
     end
 
     RENDERERS = {}
@@ -70,28 +68,30 @@ module ActionController
       end
     end
 
-    add :json do |json, options|
+    add :json do |body, json, options|
+      self.content_type ||= Mime::JSON
       json = ActiveSupport::JSON.encode(json, options) unless json.respond_to?(:to_str)
       json = "#{options[:callback]}(#{json})" unless options[:callback].blank?
-      self.content_type ||= Mime::JSON
-      self.response_body  = json
+      body << json
     end
 
-    add :js do |js, options|
+    add :js do |body, js, options|
       self.content_type ||= Mime::JS
-      self.response_body  = js.respond_to?(:to_js) ? js.to_js(options) : js
+      js = js.to_js(options) if js.respond_to?(:to_js)
+      body << js
     end
 
-    add :xml do |xml, options|
+    add :xml do |body, xml, options|
       self.content_type ||= Mime::XML
-      self.response_body  = xml.respond_to?(:to_xml) ? xml.to_xml(options) : xml
+      xml = xml.to_xml(options) if xml.respond_to?(:to_xml)
+      body << xml
     end
 
-    add :update do |proc, options|
+    add :update do |body, proc, options|
+      self.content_type = Mime::JS
       view_context = self.view_context
       generator = ActionView::Helpers::PrototypeHelper::JavaScriptGenerator.new(view_context, &proc)
-      self.content_type  = Mime::JS
-      self.response_body = generator.to_s
+      body << generator.to_s
     end
   end
 end

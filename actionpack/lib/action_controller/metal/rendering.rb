@@ -12,20 +12,21 @@ module ActionController
     end
 
     # Check for double render errors and set the content_type after rendering.
-    def render(*args) #:nodoc:
+    def render(*args, &block) #:nodoc:
       raise ::AbstractController::DoubleRenderError if response_body
-      super
-      self.content_type ||= Mime[formats.first].to_s
-      response_body
+
+      super(*args, &block).tap do
+        self.content_type ||= Mime[formats.first].to_s
+      end
     end
 
     private
 
       # Normalize arguments by catching blocks and setting them on :update.
-      def _normalize_args(action=nil, options={}, &blk) #:nodoc:
-        options = super
-        options[:update] = blk if block_given?
-        options
+      def _normalize_args(*args, &block) #:nodoc:
+        super.tap do |opts|
+          opts[:update] = block if block_given?
+        end
       end
 
       # Normalize both text and status options.

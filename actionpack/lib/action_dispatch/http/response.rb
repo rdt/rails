@@ -103,7 +103,7 @@ module ActionDispatch # :nodoc:
       str
     end
 
-    EMPTY = " "
+    EMPTY = [" "]
 
     def body=(body)
       @blank = true if body == EMPTY
@@ -151,7 +151,7 @@ module ActionDispatch # :nodoc:
       if @body.respond_to?(:call)
         @writer = lambda { |x| callback.call(x) }
         @body.call(self, self)
-      else
+      elsif @body
         @body.each { |part| callback.call(part.to_s) }
       end
 

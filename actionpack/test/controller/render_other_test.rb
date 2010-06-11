@@ -2,9 +2,9 @@ require 'abstract_unit'
 require 'controller/fake_models'
 require 'pathname'
 
-ActionController.add_renderer :simon do |says, options|
+ActionController.add_renderer :simon do |body, says, options|
   self.content_type  = Mime::TEXT
-  self.response_body = "Simon says: #{says}"
+  body << "Simon says: #{says}"
 end
 
 class RenderOtherTest < ActionController::TestCase

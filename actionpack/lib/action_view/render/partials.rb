@@ -209,41 +209,38 @@ module ActionView
         end
       end
 
-      def render
+      def render(body)
         identifier = ((@template = find_template) ? @template.identifier : @path)
 
         if @collection
-          ActiveSupport::Notifications.instrument("render_collection.action_view",
-            :identifier => identifier || "collection", :count => @collection.size) do
-            render_collection
+          ActiveSupport::Notifications.instrument("render_collection.action_view", :identifier => identifier || "collection", :count => @collection.size) do
+            render_collection(body)
           end
         else
-          content = ActiveSupport::Notifications.instrument("render_partial.action_view",
-            :identifier => identifier) do
-            render_partial
+          ActiveSupport::Notifications.instrument("render_partial.action_view", :identifier => identifier) do
+            if !@block && (layout = @options[:layout])
+              @view._render_layout(body, find_template(layout), @locals) { render_partial }
+            else
+              render_partial_to_body(body)
+            end
+          end
+        end
+
+        body
+      end
+
+      def render_collection(body)
+        if @collection.present?
+          if @options.key?(:spacer_template)
+            spacer = find_template(@options[:spacer_template]).render(@view, @locals)
           end
 
-          if !@block && (layout = @options[:layout])
-            content = @view._render_layout(find_template(layout), @locals){ content }
-          end
-
-          content
+          @template ? collection_with_template(body, spacer) : collection_without_template(body, spacer)
         end
       end
 
-      def render_collection
-        return nil if @collection.blank?
-
-        if @options.key?(:spacer_template)
-          spacer = find_template(@options[:spacer_template]).render(@view, @locals)
-        end
-
-        result = @template ? collection_with_template : collection_without_template
-        result.join(spacer).html_safe
-      end
-
-      def collection_with_template(template = @template)
-        segments, locals, template = [], @locals, @template
+      def collection_with_template(body, spacer, template = @template)
+        locals, template = @locals, @template
 
         if @options[:as]
           as = @options[:as]
@@ -253,20 +250,18 @@ module ActionView
           counter = template.counter_name
         end
 
-        locals[counter] = -1
-
-        @collection.each do |object|
-          locals[counter] += 1
+        @collection.each_with_index do |object, i|
+          locals[counter] = i
           locals[as] = object
-          segments << template.render(@view, locals)
-        end
 
-        segments
+          body << spacer unless i == 0
+          template.render_to_body(body, @view, locals)
+        end
       end
 
-      def collection_without_template(collection_paths = @collection_paths)
-        segments, locals = [], @locals
-        index, template  = -1, nil
+      def collection_without_template(body, spacer, collection_paths = @collection_paths)
+        locals = @locals
+        template = nil
 
         if @options[:as]
           as = @options[:as]
@@ -276,22 +271,28 @@ module ActionView
         @collection.each_with_index do |object, i|
           template = find_template(collection_paths[i])
           locals[as || template.variable_name] = object
-          locals[counter || template.counter_name] = (index += 1)
+          locals[counter || template.counter_name] = i
 
-          segments << template.render(@view, locals)
+          body << spacer unless i == 0
+          template.render_to_body(body, @view, locals)
         end
 
         @template = template
-        segments
       end
 
       def render_partial(object = @object)
+        body = []
+        render_partial_to_body(body, object)
+        @view._body_to_string(body)
+      end
+
+      def render_partial_to_body(body, object = @object)
         locals, view, template = @locals, @view, @template
 
         object ||= locals[template.variable_name]
         locals[@options[:as] || template.variable_name] = object
 
-        template.render(view, locals) do |*name|
+        template.render_to_body(body, view, locals) do |*name|
           view._layout_for(*name, &@block)
         end
       end
@@ -324,14 +325,14 @@ module ActionView
       end
     end
 
-    def _render_partial(options, &block) #:nodoc:
+    def _render_partial(body, options, &layout_block) #:nodoc:
       if defined?(@renderer)
-        @renderer.setup(options, block)
+        @renderer.setup(options, layout_block)
       else
-        @renderer = PartialRenderer.new(self, options, block)
+        @renderer = PartialRenderer.new(self, options, layout_block)
       end
 
-      @renderer.render
+      @renderer.render(body)
     end
 
   end

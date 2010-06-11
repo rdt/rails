@@ -33,7 +33,7 @@ module ActionController
       end
     end
 
-    def render(*args)
+    def render(*args, &block)
       render_output = nil
       self.view_runtime = cleanup_view_runtime do
         Benchmark.ms { render_output = super }

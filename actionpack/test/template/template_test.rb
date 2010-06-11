@@ -36,6 +36,10 @@ class TestERBTemplate < ActiveSupport::TestCase
     def my_buffer
       @output_buffer
     end
+
+    def _body_to_string(body)
+      body.join('')
+    end
   end
 
   def new_template(body = "<%= hello %>", handler = ERBHandler, details = {})

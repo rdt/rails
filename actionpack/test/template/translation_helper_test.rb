@@ -32,13 +32,13 @@ class TranslationHelperTest < ActiveSupport::TestCase
   def test_scoping_by_partial
     I18n.expects(:translate).with("test.translation.helper", :raise => true).returns("helper")
     @view = ActionView::Base.new(ActionController::Base.view_paths, {})
-    assert_equal "helper", @view.render(:file => "test/translation")
+    assert_equal "helper", @view.render(:file => "test/translation").to_s
   end
 
   def test_scoping_by_partial_of_an_array
     I18n.expects(:translate).with("test.scoped_translation.foo.bar", :raise => true).returns(["foo", "bar"])
     @view = ActionView::Base.new(ActionController::Base.view_paths, {})
-    assert_equal "foobar", @view.render(:file => "test/scoped_translation")
+    assert_equal "foobar", @view.render(:file => "test/scoped_translation").to_s
   end
   
   def test_translate_does_not_mark_plain_text_as_safe_html

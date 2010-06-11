@@ -32,13 +32,14 @@ module AbstractController
 
       def _prefix() end
 
-      def render(options = {})
+      def _normalize_options(options = {})
+        super
+
         if options.is_a?(String)
           options = {:_template_name => options}
         end
 
         options[:_prefix] = _prefix
-        super
       end
 
       append_view_path File.expand_path(File.join(File.dirname(__FILE__), "views"))
@@ -63,7 +64,7 @@ module AbstractController
       end
 
       def rendering_to_body
-        self.response_body = render_to_body :template => "naked_render.erb"
+        self.response_body = render_to_body [], :template => "naked_render.erb"
       end
 
       def rendering_to_string
@@ -78,33 +79,38 @@ module AbstractController
 
       test "rendering templates works" do
         @controller.process(:index)
-        assert_equal "Hello from index.erb", @controller.response_body
+        assert_equal "Hello from index.erb", response_body
       end
 
       test "render_to_string works with a String as an argument" do
         @controller.process(:index_to_string)
-        assert_equal "Hello from index.erb", @controller.response_body
+        assert_equal "Hello from index.erb", response_body
       end
 
       test "rendering passes ivars to the view" do
         @controller.process(:action_with_ivars)
-        assert_equal "Hello from index_with_ivars.erb", @controller.response_body
+        assert_equal "Hello from index_with_ivars.erb", response_body
       end
 
       test "rendering with no template name" do
         @controller.process(:naked_render)
-        assert_equal "Hello from naked_render.erb", @controller.response_body
+        assert_equal "Hello from naked_render.erb", response_body
       end
 
       test "rendering to a rack body" do
         @controller.process(:rendering_to_body)
-        assert_equal "Hello from naked_render.erb", @controller.response_body
+        assert_equal "Hello from naked_render.erb", response_body
       end
 
       test "rendering to a string" do
         @controller.process(:rendering_to_string)
-        assert_equal "Hello from naked_render.erb", @controller.response_body
+        assert_equal "Hello from naked_render.erb", response_body
       end
+
+      private
+        def response_body
+          @controller.response_body.to_s
+        end
     end
 
     # Test rendering with prefixes
@@ -139,13 +145,18 @@ module AbstractController
 
       test "templates are located inside their 'prefix' folder" do
         @controller.process(:index)
-        assert_equal "Hello from me3/index.erb", @controller.response_body
+        assert_equal "Hello from me3/index.erb", response_body
       end
 
       test "templates included their format" do
         @controller.process(:formatted)
-        assert_equal "Hello from me3/formatted.html.erb", @controller.response_body
+        assert_equal "Hello from me3/formatted.html.erb", response_body
       end
+
+      private
+        def response_body
+          @controller.response_body.to_s
+        end
     end
 
     # Test rendering with layouts
@@ -166,9 +177,9 @@ module AbstractController
         end
       end
 
-      def render_to_body(options = {})
-        options[:_layout] = options[:layout] || _default_layout({})
+      def _normalize_options(options)
         super
+        options[:_layout] = options[:layout] || _default_layout({})
       end
     end
 
@@ -188,7 +199,7 @@ module AbstractController
       test "layouts are included" do
         controller = Me4.new
         result = controller.process(:index)
-        assert_equal "Me4 Enter : Hello from me4/index.erb : Exit", controller.response_body
+        assert_equal ["Me4 Enter : Hello from me4/index.erb : Exit"], controller.response_body
       end
     end
 

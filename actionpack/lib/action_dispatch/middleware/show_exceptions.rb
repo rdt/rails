@@ -104,11 +104,11 @@ module ActionDispatch
         path = "#{public_path}/#{status}.html"
 
         if locale_path && File.exist?(locale_path)
-          render(status, File.read(locale_path))
+          render(status, [File.read(locale_path)])
         elsif File.exist?(path)
-          render(status, File.read(path))
+          render(status, [File.read(path)])
         else
-          render(status, '')
+          render(status, [])
         end
       end
 
@@ -122,7 +122,7 @@ module ActionDispatch
       end
 
       def render(status, body)
-        [status, {'Content-Type' => 'text/html', 'Content-Length' => body.bytesize.to_s}, [body]]
+        [status, { 'Content-Type' => 'text/html' }, body]
       end
 
       def public_path

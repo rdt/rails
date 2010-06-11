@@ -52,17 +52,17 @@ module AbstractController
 
       def test_helpers_with_block
         @controller.process(:with_block)
-        assert_equal "Hello World", @controller.response_body
+        assert_equal ["Hello World"], @controller.response_body
       end
 
       def test_helpers_with_module
         @controller.process(:with_module)
-        assert_equal "Module Included", @controller.response_body
+        assert_equal ["Module Included"], @controller.response_body
       end
 
       def test_helpers_with_symbol
         @controller.process(:with_symbol)
-        assert_equal "I respond to bare_a: true", @controller.response_body
+        assert_equal ["I respond to bare_a: true"], @controller.response_body
       end
 
       def test_declare_missing_helper
@@ -72,7 +72,7 @@ module AbstractController
       def test_helpers_with_module_through_block
         @controller = AbstractHelpersBlock.new
         @controller.process(:with_module)
-        assert_equal "Module Included", @controller.response_body
+        assert_equal ["Module Included"], @controller.response_body
       end
 
     end

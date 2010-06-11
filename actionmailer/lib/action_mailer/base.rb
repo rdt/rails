@@ -450,6 +450,11 @@ module ActionMailer #:nodoc:
       super
     end
 
+    def render(*args, &block)
+      super
+      self.response_body = _body_to_string(response_body)
+    end
+
     # Allows you to pass random and unusual headers to the new +Mail::Message+ object
     # which will add them to itself.
     #
@@ -637,6 +642,12 @@ module ActionMailer #:nodoc:
     end
 
   protected
+
+    def _body_to_string(body)
+      str = nil
+      response_body.each { |part| str ? str << part.to_s : str = part.to_s }
+      str
+    end
 
     def set_content_type(m, user_content_type, class_default)
       params = m.content_type_parameters || {}
