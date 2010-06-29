@@ -89,9 +89,7 @@ module AbstractController
     # Normalize arguments, options and then delegates render_to_body and
     # sticks the result in self.response_body.
     def render(*args, &block)
-      body = []
-      render_to_body(body, *args, &block)
-      self.response_body = body.presence
+      self.response_body = render_to_body([], *args, &block).presence
     end
 
     # Raw rendering of a template to a string. Just convert the results of
