@@ -529,6 +529,8 @@ module ActionView
         def html_options_for_form(url_for_options, options, *parameters_for_url)
           returning options.stringify_keys do |html_options|
             html_options["enctype"] = "multipart/form-data" if html_options.delete("multipart")
+            # The following URL is unescaped, this is just a hash of options, and it is the
+            # responsability of the caller to escape all the values.
             html_options["action"]  = url_for(url_for_options, *parameters_for_url)
             html_options["accept-charset"] = "UTF-8"
             html_options["data-remote"] = true if html_options.delete("remote")
@@ -537,7 +539,7 @@ module ActionView
 
         def extra_tags_for_form(html_options)
           snowman_tag = tag(:input, :type => "hidden",
-                            :name => "_snowman_", :value => "&#9731;")
+                            :name => "_snowman", :value => "&#9731;".html_safe)
 
           method = html_options.delete("method").to_s
 

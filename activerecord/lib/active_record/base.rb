@@ -398,7 +398,7 @@ module ActiveRecord #:nodoc:
 
       delegate :find, :first, :last, :all, :destroy, :destroy_all, :exists?, :delete, :delete_all, :update, :update_all, :to => :scoped
       delegate :find_each, :find_in_batches, :to => :scoped
-      delegate :select, :group, :order, :limit, :joins, :where, :preload, :eager_load, :includes, :from, :lock, :readonly, :having, :to => :scoped
+      delegate :select, :group, :order, :limit, :joins, :where, :preload, :eager_load, :includes, :from, :lock, :readonly, :having, :create_with, :to => :scoped
       delegate :count, :average, :minimum, :maximum, :sum, :calculate, :to => :scoped
 
       # Executes a custom SQL query against your database and returns all the results.  The results will
@@ -720,14 +720,6 @@ module ActiveRecord #:nodoc:
       end
       alias :sequence_name= :set_sequence_name
 
-      # Turns the +table_name+ back into a class name following the reverse rules of +table_name+.
-      def class_name(table_name = table_name) # :nodoc:
-        # remove any prefix and/or suffix from the table name
-        class_name = table_name[table_name_prefix.length..-(table_name_suffix.length + 1)].camelize
-        class_name = class_name.singularize if pluralize_table_names
-        class_name
-      end
-
       # Indicates whether the table associated with this class exists
       def table_exists?
         connection.table_exists?(table_name)
@@ -801,7 +793,7 @@ module ActiveRecord #:nodoc:
       def reset_column_information
         undefine_attribute_methods
         @column_names = @columns = @columns_hash = @content_columns = @dynamic_methods_hash = @inheritance_column = nil
-        @arel_engine = @unscoped = @arel_table = nil
+        @arel_engine = @relation = @arel_table = nil
       end
 
       def reset_column_information_and_inheritable_attributes_for_all_subclasses#:nodoc:
@@ -904,11 +896,6 @@ module ActiveRecord #:nodoc:
         store_full_sti_class ? name : name.demodulize
       end
 
-      def unscoped
-        @unscoped ||= Relation.new(self, arel_table)
-        finder_needs_type_condition? ? @unscoped.where(type_condition) : @unscoped
-      end
-
       def arel_table
         @arel_table ||= Arel::Table.new(table_name, :engine => arel_engine)
       end
@@ -923,7 +910,38 @@ module ActiveRecord #:nodoc:
         end
       end
 
+      # Returns a scope for this class without taking into account the default_scope.
+      #
+      #   class Post < ActiveRecord::Base
+      #     default_scope :published => true
+      #   end
+      #
+      #   Post.all          # Fires "SELECT * FROM posts WHERE published = true"
+      #   Post.unscoped.all # Fires "SELECT * FROM posts"
+      #
+      # This method also accepts a block meaning that all queries inside the block will
+      # not use the default_scope:
+      #
+      #   Post.unscoped {
+      #     limit(10) # Fires "SELECT * FROM posts LIMIT 10"
+      #   }
+      #
+      def unscoped
+        block_given? ? relation.scoping { yield } : relation
+      end
+
+      def scoped_methods #:nodoc:
+        key = :"#{self}_scoped_methods"
+        Thread.current[key] = Thread.current[key].presence || self.default_scoping.dup
+      end
+
       private
+
+        def relation #:nodoc:
+          @relation ||= Relation.new(self, arel_table)
+          finder_needs_type_condition? ? @relation.where(type_condition) : @relation
+        end
+
         # Finder methods must instantiate through this method to work with the
         # single-table inheritance model that makes it possible to create
         # objects of different types from the same table.
@@ -1157,6 +1175,20 @@ module ActiveRecord #:nodoc:
 
         # Works like with_scope, but discards any nested properties.
         def with_exclusive_scope(method_scoping = {}, &block)
+          if method_scoping.values.any? { |e| e.is_a?(ActiveRecord::Relation) }
+            raise ArgumentError, <<-MSG
+New finder API can not be used with_exclusive_scope. You can either call unscoped to get an anonymous scope not bound to the default_scope:
+
+  User.unscoped.where(:active => true)
+
+Or call unscoped with a block:
+
+  User.unscoped do
+    User.where(:active => true).all
+  end
+
+MSG
+          end
           with_scope(method_scoping, :overwrite, &block)
         end
 
@@ -1168,11 +1200,6 @@ module ActiveRecord #:nodoc:
         #   end
         def default_scope(options = {})
           self.default_scoping << construct_finder_arel(options, default_scoping.pop)
-        end
-
-        def scoped_methods #:nodoc:
-          key = :"#{self}_scoped_methods"
-          Thread.current[key] = Thread.current[key].presence || self.default_scoping.dup
         end
 
         def current_scoped_methods #:nodoc:

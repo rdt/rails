@@ -44,20 +44,8 @@ class UrlHelperTest < ActiveSupport::TestCase
   end
   alias url_hash hash_for
 
-  def test_url_for_escapes_urls
-    assert_equal "/?a=b&amp;c=d", url_for(abcd)
-    assert_equal "/?a=b&amp;c=d", url_for(abcd(:escape => true))
-    assert_equal "/?a=b&c=d", url_for(abcd(:escape => false))
-  end
-
-  def test_url_for_escaping_is_safety_aware
-    assert url_for(abcd(:escape => true)).html_safe?, "escaped urls should be html_safe?"
-    assert !url_for(abcd(:escape => false)).html_safe?, "non-escaped urls should not be html_safe?"
-  end
-
-  def test_url_for_escapes_url_once
-    assert_equal "/?a=b&amp;c=d", url_for("/?a=b&amp;c=d")
-    assert_equal "/?a=b&amp;c=d", url_for(abcd)
+  def test_url_for_does_not_escape_urls
+    assert_equal "/?a=b&c=d", url_for(abcd)
   end
 
   def test_url_for_with_back
@@ -81,8 +69,8 @@ class UrlHelperTest < ActiveSupport::TestCase
     assert_dom_equal "<form method=\"post\" action=\"http://www.example.com/q1=v1&amp;q2=v2\" class=\"button_to\"><div><input type=\"submit\" value=\"Hello\" /></div></form>", button_to("Hello", "http://www.example.com/q1=v1&q2=v2")
   end
 
-  def test_button_to_with_escaped_query
-    assert_dom_equal "<form method=\"post\" action=\"http://www.example.com/q1=v1&amp;q2=v2\" class=\"button_to\"><div><input type=\"submit\" value=\"Hello\" /></div></form>", button_to("Hello", "http://www.example.com/q1=v1&amp;q2=v2")
+  def test_button_to_with_html_safe_URL
+    assert_dom_equal "<form method=\"post\" action=\"http://www.example.com/q1=v1&amp;q2=v2\" class=\"button_to\"><div><input type=\"submit\" value=\"Hello\" /></div></form>", button_to("Hello", "http://www.example.com/q1=v1&amp;q2=v2".html_safe)
   end
 
   def test_button_to_with_query_and_no_name
@@ -151,13 +139,12 @@ class UrlHelperTest < ActiveSupport::TestCase
 
   def test_link_tag_with_query
     expected = %{<a href="http://www.example.com?q1=v1&amp;q2=v2">Hello</a>}
-    assert_dom_equal expected, link_to("Hello", "http://www.example.com?q1=v1&amp;q2=v2")
+    assert_dom_equal expected, link_to("Hello", "http://www.example.com?q1=v1&q2=v2")
   end
 
   def test_link_tag_with_query_and_no_name
-    link = link_to(nil, "http://www.example.com?q1=v1&amp;q2=v2")
     expected = %{<a href="http://www.example.com?q1=v1&amp;q2=v2">http://www.example.com?q1=v1&amp;q2=v2</a>}
-    assert_dom_equal expected, link
+    assert_dom_equal expected, link_to(nil, "http://www.example.com?q1=v1&q2=v2")
   end
 
   def test_link_tag_with_back
@@ -312,7 +299,7 @@ class UrlHelperTest < ActiveSupport::TestCase
     @request = request_for_url("/?order=desc&page=1")
 
     assert current_page?(hash_for(:order => "desc", :page => "1"))
-    assert current_page?("http://www.example.com/?order=desc&amp;page=1")
+    assert current_page?("http://www.example.com/?order=desc&page=1")
   end
 
   def test_link_unless_current
@@ -423,6 +410,14 @@ end
 class UrlHelperControllerTest < ActionController::TestCase
   class UrlHelperController < ActionController::Base
     test_routes do |map|
+      match 'url_helper_controller_test/url_helper/show/:id',
+        :to => 'url_helper_controller_test/url_helper#show',
+        :as => :show
+
+      match 'url_helper_controller_test/url_helper/profile/:name',
+        :to => 'url_helper_controller_test/url_helper#show',
+        :as => :profile
+
       match 'url_helper_controller_test/url_helper/show_named_route',
         :to => 'url_helper_controller_test/url_helper#show_named_route',
         :as => :show_named_route
@@ -433,6 +428,14 @@ class UrlHelperControllerTest < ActionController::TestCase
       match 'url_helper_controller_test/url_helper/normalize_recall_params',
         :to => UrlHelperController.action(:normalize_recall),
         :as => :normalize_recall_params
+    end
+
+    def show
+      if params[:name]
+        render :inline => 'ok'
+      else
+        redirect_to profile_path(params[:id])
+      end
     end
 
     def show_url_for
@@ -501,14 +504,23 @@ class UrlHelperControllerTest < ActionController::TestCase
     assert_equal 'http://testtwo.host/url_helper_controller_test/url_helper/show_named_route', @response.body
   end
 
-  def test_recall_params_should_be_normalized_when_using_block_route
+  def test_recall_params_should_be_normalized
     get :normalize_recall_params
     assert_equal '/url_helper_controller_test/url_helper/normalize_recall_params', @response.body
   end
 
-  def test_recall_params_should_not_be_changed_when_using_normal_route
+  def test_recall_params_should_not_be_changed
     get :recall_params_not_changed
     assert_equal '/url_helper_controller_test/url_helper/show_url_for', @response.body
+  end
+
+  def test_recall_params_should_normalize_id
+    get :show, :id => '123'
+    assert_equal 302, @response.status
+    assert_equal 'http://test.host/url_helper_controller_test/url_helper/profile/123', @response.location
+
+    get :show, :name => '123'
+    assert_equal 'ok', @response.body
   end
 end
 

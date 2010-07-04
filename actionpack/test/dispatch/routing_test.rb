@@ -35,6 +35,13 @@ class TestRoutingMapper < ActionDispatch::IntegrationTest
         end
       end
 
+      scope "bookmark", :controller => "bookmarks", :as => :bookmark do
+        get  :new, :path => "build"
+        post :create, :path => "create", :as => ""
+        put  :update
+        get  "remove", :action => :destroy, :as => :remove
+      end
+
       match 'account/logout' => redirect("/logout"), :as => :logout_redirect
       match 'account/login', :to => redirect("/login")
 
@@ -291,8 +298,8 @@ class TestRoutingMapper < ActionDispatch::IntegrationTest
 
       resource :dashboard, :constraints => { :ip => /192\.168\.1\.\d{1,3}/ }
 
+      resource :token, :module => :api
       scope :module => :api do
-        resource :token
         resources :errors, :shallow => true do
           resources :notices
         end
@@ -301,11 +308,6 @@ class TestRoutingMapper < ActionDispatch::IntegrationTest
       scope :path => 'api' do
         resource :me
         match '/' => 'mes#index'
-      end
-
-      namespace :private do
-        root :to => redirect('/private/index')
-        match "index", :to => 'private#index'
       end
 
       get "(/:username)/followers" => "followers#index"
@@ -338,6 +340,28 @@ class TestRoutingMapper < ActionDispatch::IntegrationTest
         resources :movies do
           resources :reviews
           resource :trailer
+        end
+      end
+
+      namespace :private do
+        root :to => redirect('/private/index')
+        match "index", :to => 'private#index'
+        match ":controller(/:action(/:id))"
+      end
+
+      scope :only => :index do
+        resources :clubs do
+          resources :players, :only => [:show]
+          resource  :chairman, :only => [:show]
+        end
+      end
+
+      scope :except => [:new, :create, :edit, :update] do
+        resources :sectors do
+          resources :companies, :except => :destroy do
+            resources :divisions, :only => :index
+          end
+          resource  :leader, :except => :destroy
         end
       end
 
@@ -463,6 +487,19 @@ class TestRoutingMapper < ActionDispatch::IntegrationTest
     end
   end
 
+  def test_namespace_with_controller_segment
+    with_test_routes do
+      get '/private/foo'
+      assert_equal 'private/foo#index', @response.body
+
+      get '/private/foo/bar'
+      assert_equal 'private/foo#bar', @response.body
+
+      get '/private/foo/bar/1'
+      assert_equal 'private/foo#bar', @response.body
+    end
+  end
+
   def test_session_singleton_resource
     with_test_routes do
       get '/session'
@@ -542,6 +579,26 @@ class TestRoutingMapper < ActionDispatch::IntegrationTest
 
       post '/openid/login'
       assert_equal 'openid#login', @response.body
+    end
+  end
+
+  def test_bookmarks
+    with_test_routes do
+      get '/bookmark/build'
+      assert_equal 'bookmarks#new', @response.body
+      assert_equal '/bookmark/build', new_bookmark_path
+
+      post '/bookmark/create'
+      assert_equal 'bookmarks#create', @response.body
+      assert_equal '/bookmark/create', bookmark_path
+
+      put '/bookmark'
+      assert_equal 'bookmarks#update', @response.body
+      assert_equal '/bookmark', update_bookmark_path
+
+      get '/bookmark/remove'
+      assert_equal 'bookmarks#destroy', @response.body
+      assert_equal '/bookmark/remove', bookmark_remove_path
     end
   end
 
@@ -1213,7 +1270,7 @@ class TestRoutingMapper < ActionDispatch::IntegrationTest
       assert_equal 'pass', @response.headers['X-Cascade']
       get '/products/0001/images'
       assert_equal 'images#index', @response.body
-      get '/products/0001/images/1'
+      get '/products/0001/images/0001'
       assert_equal 'images#show', @response.body
 
       get '/dashboard', {}, {'REMOTE_ADDR' => '10.0.0.100'}
@@ -1598,6 +1655,75 @@ class TestRoutingMapper < ActionDispatch::IntegrationTest
       get '/movies/00001/trailer'
       assert_equal 'Not Found', @response.body
       assert_raises(ActionController::RoutingError){ movie_trailer_path(:movie_id => '00001') }
+    end
+  end
+
+  def test_only_option_should_be_overwritten
+    with_test_routes do
+      get '/clubs'
+      assert_equal 'clubs#index', @response.body
+      assert_equal '/clubs', clubs_path
+
+      get '/clubs/1'
+      assert_equal 'Not Found', @response.body
+      assert_raise(NoMethodError) { club_path(:id => '1') }
+
+      get '/clubs/1/players'
+      assert_equal 'Not Found', @response.body
+      assert_raise(NoMethodError) { club_players_path(:club_id => '1') }
+
+      get '/clubs/1/players/2'
+      assert_equal 'players#show', @response.body
+      assert_equal '/clubs/1/players/2', club_player_path(:club_id => '1', :id => '2')
+
+      get '/clubs/1/chairman/new'
+      assert_equal 'Not Found', @response.body
+      assert_raise(NoMethodError) { new_club_chairman_path(:club_id => '1') }
+
+      get '/clubs/1/chairman'
+      assert_equal 'chairmen#show', @response.body
+      assert_equal '/clubs/1/chairman', club_chairman_path(:club_id => '1')
+    end
+  end
+
+  def test_except_option_should_be_overwritten
+    with_test_routes do
+      get '/sectors'
+      assert_equal 'sectors#index', @response.body
+      assert_equal '/sectors', sectors_path
+
+      get '/sectors/1/edit'
+      assert_equal 'Not Found', @response.body
+      assert_raise(NoMethodError) { edit_sector_path(:id => '1') }
+
+      delete '/sectors/1'
+      assert_equal 'sectors#destroy', @response.body
+
+      get '/sectors/1/companies/new'
+      assert_equal 'companies#new', @response.body
+      assert_equal '/sectors/1/companies/new', new_sector_company_path(:sector_id => '1')
+
+      delete '/sectors/1/companies/1'
+      assert_equal 'Not Found', @response.body
+
+      get '/sectors/1/leader/new'
+      assert_equal 'leaders#new', @response.body
+      assert_equal '/sectors/1/leader/new', new_sector_leader_path(:sector_id => '1')
+
+      delete '/sectors/1/leader'
+      assert_equal 'Not Found', @response.body
+    end
+  end
+
+  def test_only_option_should_overwrite_except_option
+    with_test_routes do
+      get '/sectors/1/companies/2/divisions'
+      assert_equal 'divisions#index', @response.body
+      assert_equal '/sectors/1/companies/2/divisions', sector_company_divisions_path(:sector_id => '1', :company_id => '2')
+
+      get '/sectors/1/companies/2/divisions/3'
+      assert_equal 'Not Found', @response.body
+      assert_raise(NoMethodError) { sector_company_division_path(:sector_id => '1', :company_id => '2', :id => '3') }
     end
   end
 

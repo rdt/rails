@@ -275,7 +275,7 @@ module ActionView
       end
 
       def build_method_name(locals)
-        @method_names[locals.keys.hash] ||= "#{identifier_method_name}__#{@identifier.hash}_#{__id__}_#{locals.keys.hash}".gsub('-', "_")
+        @method_names[locals.keys.hash] ||= "_#{identifier_method_name}__#{@identifier.hash}_#{__id__}_#{locals.keys.hash}".gsub('-', "_")
       end
 
       def identifier_method_name
